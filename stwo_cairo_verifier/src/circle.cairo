@@ -1,7 +1,10 @@
 use stwo_cairo_verifier::fields::m31::{M31, m31};
+use stwo_cairo_verifier::utils::pow;
 
 pub const M31_CIRCLE_GEN: CirclePointM31 =
     CirclePointM31 { x: M31 { inner: 2 }, y: M31 { inner: 1268011823 }, };
+
+pub const CIRCLE_ORDER: u32 = 2147483648;
 
 #[derive(Drop, Copy, Debug, PartialEq, Eq)]
 pub struct CirclePointM31 {
@@ -37,9 +40,61 @@ impl CirclePointM31Add of Add<CirclePointM31> {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Drop)]
+pub struct Coset {
+    pub initial_index: usize,
+    pub step_size: usize,
+    pub log_size: u32,
+}
+
+#[generate_trait]
+pub impl CosetImpl of CosetTrait {
+    fn index_at(self: @Coset, index: usize) -> usize {
+        let initial_index = *self.initial_index;
+        let step_size = *self.step_size;
+        let index_times_step = (core::integer::u32_wide_mul(step_size, index) & 0x7fffffff)
+            .try_into()
+            .unwrap();
+        let result = core::integer::u32_wrapping_add(initial_index, index_times_step) & 0x7fffffff;
+        result
+    }
+
+    fn new(initial_index: usize, log_size: u32) -> Coset {
+        let step_size = pow(2, 31 - log_size);
+        Coset { initial_index, step_size, log_size }
+    }
+
+    fn double(self: @Coset) -> Coset {
+        let initial_index = *self.initial_index;
+        let step_size = *self.step_size;
+        let double_initial_index = core::integer::u32_wrapping_add(initial_index, initial_index);
+        let double_step_size = core::integer::u32_wrapping_add(step_size, step_size);
+        let log_size = if *self.log_size == 0 {
+            0
+        } else {
+            *self.log_size - 1
+        };
+
+        Coset {
+            initial_index: double_initial_index & 0x7fffffff,
+            step_size: double_step_size & 0x7fffffff,
+            log_size
+        }
+    }
+
+    fn at(self: @Coset, index: usize) -> CirclePointM31 {
+        M31_CIRCLE_GEN.mul(self.index_at(index))
+    }
+
+    fn size(self: @Coset) -> usize {
+        pow(2, *self.log_size)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
-    use super::{M31_CIRCLE_GEN, CirclePointM31, CirclePointM31Impl};
+    use super::{M31_CIRCLE_GEN, CirclePointM31, CirclePointM31Impl, Coset, CosetImpl};
     use stwo_cairo_verifier::fields::m31::m31;
     use stwo_cairo_verifier::utils::pow;
 
@@ -114,6 +169,38 @@ mod tests {
         let expected_result = CirclePointM31 { x: -m31(1), y: m31(0) };
 
         // Assert `M31_CIRCLE_GEN^{2^30}` equals `-1`.
+        assert_eq!(expected_result, result);
+    }
+
+    #[test]
+    fn test_coset_index_at() {
+        let coset = Coset { initial_index: 16777216, log_size: 5, step_size: 67108864 };
+        let result = coset.index_at(8);
+        let expected_result = 553648128;
+        assert_eq!(expected_result, result);
+    }
+
+    #[test]
+    fn test_coset_constructor() {
+        let result = CosetImpl::new(16777216, 5);
+        let expected_result = Coset { initial_index: 16777216, log_size: 5, step_size: 67108864 };
+        assert_eq!(expected_result, result);
+    }
+
+    #[test]
+    fn test_coset_double() {
+        let coset = Coset { initial_index: 16777216, step_size: 67108864, log_size: 5 };
+        let result = coset.double();
+
+        let expected_result = Coset { initial_index: 33554432, step_size: 134217728, log_size: 4 };
+        assert_eq!(expected_result, result);
+    }
+
+    #[test]
+    fn test_coset_at() {
+        let coset = Coset { initial_index: 16777216, step_size: 67108864, log_size: 5 };
+        let result = coset.at(17);
+        let expected_result = CirclePointM31 { x: m31(7144319), y: m31(1742797653) };
         assert_eq!(expected_result, result);
     }
 }
