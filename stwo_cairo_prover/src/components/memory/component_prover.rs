@@ -12,16 +12,17 @@ use stwo_prover::core::fields::FieldExpOps;
 use stwo_prover::core::poly::circle::CanonicCoset;
 use stwo_prover::core::utils::{
     bit_reverse, point_vanish_denominator_inverses, previous_bit_reversed_circle_domain_index,
+    shifted_secure_combination,
 };
 use stwo_prover::core::{InteractionElements, LookupValues};
 use stwo_prover::trace_generation::{BASE_TRACE, INTERACTION_TRACE};
 
 use super::component::{
-    RangeCheckUnitComponent, RC_LOOKUP_VALUE_0, RC_LOOKUP_VALUE_1, RC_LOOKUP_VALUE_2,
-    RC_LOOKUP_VALUE_3, RC_Z,
+    MemoryComponent, MEMORY_ALPHA, MEMORY_LOOKUP_VALUE_0, MEMORY_LOOKUP_VALUE_1,
+    MEMORY_LOOKUP_VALUE_2, MEMORY_LOOKUP_VALUE_3, MEMORY_Z, MULTIPLICITY_COLUMN, N_M31_IN_FELT252,
 };
 
-impl ComponentProver<CpuBackend> for RangeCheckUnitComponent {
+impl ComponentProver<CpuBackend> for MemoryComponent {
     fn evaluate_constraint_quotients_on_domain(
         &self,
         trace: &ComponentTrace<'_, CpuBackend>,
@@ -50,12 +51,15 @@ impl ComponentProver<CpuBackend> for RangeCheckUnitComponent {
         bit_reverse(&mut step_denoms);
         let mut step_denom_inverses = vec![BaseField::zero(); 1 << (max_constraint_degree)];
         BaseField::batch_inverse(&step_denoms, &mut step_denom_inverses);
-        let z = interaction_elements[RC_Z];
+        let (alpha, z) = (
+            interaction_elements[MEMORY_ALPHA],
+            interaction_elements[MEMORY_Z],
+        );
         let lookup_value = SecureField::from_m31(
-            lookup_values[RC_LOOKUP_VALUE_0],
-            lookup_values[RC_LOOKUP_VALUE_1],
-            lookup_values[RC_LOOKUP_VALUE_2],
-            lookup_values[RC_LOOKUP_VALUE_3],
+            lookup_values[MEMORY_LOOKUP_VALUE_0],
+            lookup_values[MEMORY_LOOKUP_VALUE_1],
+            lookup_values[MEMORY_LOOKUP_VALUE_2],
+            lookup_values[MEMORY_LOOKUP_VALUE_3],
         );
         for (i, (first_point_denom_inverse, last_point_denom_inverse, step_denom_inverse)) in izip!(
             first_point_denom_inverses,
@@ -75,14 +79,17 @@ impl ComponentProver<CpuBackend> for RangeCheckUnitComponent {
             let prev_value = SecureField::from_m31_array(std::array::from_fn(|j| {
                 trace_evals[INTERACTION_TRACE][j][prev_index]
             }));
+            let address_and_value: [BaseField; N_M31_IN_FELT252 + 1] =
+                std::array::from_fn(|j| trace_evals[BASE_TRACE][j][i]);
 
             let first_point_numerator = accum.random_coeff_powers[2]
-                * (value * (z - trace_evals[BASE_TRACE][0][i]) - trace_evals[BASE_TRACE][1][i]);
+                * (value * shifted_secure_combination(&address_and_value, alpha, z)
+                    - trace_evals[BASE_TRACE][MULTIPLICITY_COLUMN][i]);
 
             let last_point_numerator = accum.random_coeff_powers[1] * (value - lookup_value);
             let step_numerator = accum.random_coeff_powers[0]
-                * ((value - prev_value) * (z - trace_evals[BASE_TRACE][0][i])
-                    - trace_evals[BASE_TRACE][1][i]);
+                * ((value - prev_value) * shifted_secure_combination(&address_and_value, alpha, z)
+                    - trace_evals[BASE_TRACE][MULTIPLICITY_COLUMN][i]);
             accum.accumulate(
                 i,
                 first_point_numerator * first_point_denom_inverse
@@ -97,28 +104,28 @@ impl ComponentProver<CpuBackend> for RangeCheckUnitComponent {
         let trace_poly = &trace.polys[INTERACTION_TRACE];
         let values = BTreeMap::from_iter([
             (
-                RC_LOOKUP_VALUE_0.to_string(),
+                MEMORY_LOOKUP_VALUE_0.to_string(),
                 trace_poly[0]
                     .eval_at_point(domain.at(1).into_ef())
                     .try_into()
                     .unwrap(),
             ),
             (
-                RC_LOOKUP_VALUE_1.to_string(),
+                MEMORY_LOOKUP_VALUE_1.to_string(),
                 trace_poly[1]
                     .eval_at_point(domain.at(1).into_ef())
                     .try_into()
                     .unwrap(),
             ),
             (
-                RC_LOOKUP_VALUE_2.to_string(),
+                MEMORY_LOOKUP_VALUE_2.to_string(),
                 trace_poly[2]
                     .eval_at_point(domain.at(1).into_ef())
                     .try_into()
                     .unwrap(),
             ),
             (
-                RC_LOOKUP_VALUE_3.to_string(),
+                MEMORY_LOOKUP_VALUE_3.to_string(),
                 trace_poly[3]
                     .eval_at_point(domain.at(1).into_ef())
                     .try_into()

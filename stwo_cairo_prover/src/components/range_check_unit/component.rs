@@ -4,7 +4,7 @@ use stwo_prover::core::air::accumulation::PointEvaluationAccumulator;
 use stwo_prover::core::air::mask::fixed_mask_points;
 use stwo_prover::core::air::Component;
 use stwo_prover::core::backend::CpuBackend;
-use stwo_prover::core::circle::{CirclePoint, Coset};
+use stwo_prover::core::circle::CirclePoint;
 use stwo_prover::core::constraints::{coset_vanishing, point_excluder, point_vanishing};
 use stwo_prover::core::fields::m31::BaseField;
 use stwo_prover::core::fields::qm31::SecureField;
@@ -29,61 +29,12 @@ pub const RC_LOOKUP_VALUE_3: &str = "RC_UNIT_LOOKUP_3";
 
 #[derive(Clone)]
 pub struct RangeCheckUnitComponent {
-    pub log_n_instances: u32,
+    pub log_n_rows: u32,
 }
 
 pub struct RangeCheckUnitTraceGenerator {
     pub max_value: usize,
     pub multiplicities: Vec<u32>,
-}
-
-impl RangeCheckUnitComponent {
-    fn evaluate_lookup_boundary_constraints_at_point(
-        &self,
-        point: CirclePoint<SecureField>,
-        mask: &TreeVec<Vec<Vec<SecureField>>>,
-        evaluation_accumulator: &mut PointEvaluationAccumulator,
-        interaction_elements: &InteractionElements,
-        constraint_zero_domain: Coset,
-        lookup_values: &LookupValues,
-    ) {
-        let z = interaction_elements[RC_Z];
-        let value =
-            SecureField::from_partial_evals(std::array::from_fn(|i| mask[INTERACTION_TRACE][i][0]));
-        let numerator = value * (z - mask[BASE_TRACE][0][0]) - mask[BASE_TRACE][1][0];
-        let denom = point_vanishing(constraint_zero_domain.at(0), point);
-        evaluation_accumulator.accumulate(numerator / denom);
-
-        let lookup_value = SecureField::from_m31(
-            lookup_values[RC_LOOKUP_VALUE_0],
-            lookup_values[RC_LOOKUP_VALUE_1],
-            lookup_values[RC_LOOKUP_VALUE_2],
-            lookup_values[RC_LOOKUP_VALUE_3],
-        );
-        let numerator = value - lookup_value;
-        let denom = point_vanishing(constraint_zero_domain.at(1), point);
-        evaluation_accumulator.accumulate(numerator / denom);
-    }
-
-    fn evaluate_lookup_step_constraints_at_point(
-        &self,
-        point: CirclePoint<SecureField>,
-        mask: &TreeVec<Vec<Vec<SecureField>>>,
-        evaluation_accumulator: &mut PointEvaluationAccumulator,
-        constraint_zero_domain: Coset,
-        interaction_elements: &InteractionElements,
-    ) {
-        let z = interaction_elements[RC_Z];
-        let value =
-            SecureField::from_partial_evals(std::array::from_fn(|i| mask[INTERACTION_TRACE][i][0]));
-        let prev_value =
-            SecureField::from_partial_evals(std::array::from_fn(|i| mask[INTERACTION_TRACE][i][1]));
-        let numerator =
-            (value - prev_value) * (z - mask[BASE_TRACE][0][0]) - mask[BASE_TRACE][1][0];
-        let denom = coset_vanishing(constraint_zero_domain, point)
-            / point_excluder(constraint_zero_domain.at(0), point);
-        evaluation_accumulator.accumulate(numerator / denom);
-    }
 }
 
 impl Component for RangeCheckUnitComponent {
@@ -92,13 +43,13 @@ impl Component for RangeCheckUnitComponent {
     }
 
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.log_n_instances + 1
+        self.log_n_rows + 1
     }
 
     fn trace_log_degree_bounds(&self) -> TreeVec<ColumnVec<u32>> {
         TreeVec::new(vec![
-            vec![self.log_n_instances; 2],
-            vec![self.log_n_instances; SECURE_EXTENSION_DEGREE],
+            vec![self.log_n_rows; 2],
+            vec![self.log_n_rows; SECURE_EXTENSION_DEGREE],
         ])
     }
 
@@ -106,7 +57,7 @@ impl Component for RangeCheckUnitComponent {
         &self,
         point: CirclePoint<SecureField>,
     ) -> TreeVec<ColumnVec<Vec<CirclePoint<SecureField>>>> {
-        let domain = CanonicCoset::new(self.log_n_instances);
+        let domain = CanonicCoset::new(self.log_n_rows);
         TreeVec::new(vec![
             fixed_mask_points(&vec![vec![0_usize]; 2], point),
             vec![vec![point, point - domain.step().into_ef()]; SECURE_EXTENSION_DEGREE],
@@ -121,22 +72,34 @@ impl Component for RangeCheckUnitComponent {
         interaction_elements: &InteractionElements,
         lookup_values: &LookupValues,
     ) {
-        let constraint_zero_domain = CanonicCoset::new(self.log_n_instances).coset;
-        self.evaluate_lookup_boundary_constraints_at_point(
-            point,
-            mask,
-            evaluation_accumulator,
-            interaction_elements,
-            constraint_zero_domain,
-            lookup_values,
+        // First lookup point boundary constraint.
+        let constraint_zero_domain = CanonicCoset::new(self.log_n_rows).coset;
+        let z = interaction_elements[RC_Z];
+        let value =
+            SecureField::from_partial_evals(std::array::from_fn(|i| mask[INTERACTION_TRACE][i][0]));
+        let numerator = value * (z - mask[BASE_TRACE][0][0]) - mask[BASE_TRACE][1][0];
+        let denom = point_vanishing(constraint_zero_domain.at(0), point);
+        evaluation_accumulator.accumulate(numerator / denom);
+
+        // Last lookup point boundary constraint.
+        let lookup_value = SecureField::from_m31(
+            lookup_values[RC_LOOKUP_VALUE_0],
+            lookup_values[RC_LOOKUP_VALUE_1],
+            lookup_values[RC_LOOKUP_VALUE_2],
+            lookup_values[RC_LOOKUP_VALUE_3],
         );
-        self.evaluate_lookup_step_constraints_at_point(
-            point,
-            mask,
-            evaluation_accumulator,
-            constraint_zero_domain,
-            interaction_elements,
-        );
+        let numerator = value - lookup_value;
+        let denom = point_vanishing(constraint_zero_domain.at(1), point);
+        evaluation_accumulator.accumulate(numerator / denom);
+
+        // Lookup step constraint.
+        let prev_value =
+            SecureField::from_partial_evals(std::array::from_fn(|i| mask[INTERACTION_TRACE][i][1]));
+        let numerator =
+            (value - prev_value) * (z - mask[BASE_TRACE][0][0]) - mask[BASE_TRACE][1][0];
+        let denom = coset_vanishing(constraint_zero_domain, point)
+            / point_excluder(constraint_zero_domain.at(0), point);
+        evaluation_accumulator.accumulate(numerator / denom);
     }
 }
 
@@ -175,6 +138,8 @@ impl ComponentTraceGenerator<CpuBackend> for RangeCheckUnitTraceGenerator {
 
         let mut trace = vec![vec![BaseField::zero(); rc_max_value]; 2];
         for (i, multiplicity) in rc_unit_trace_generator.multiplicities.iter().enumerate() {
+            // TODO(AlonH): Either create a constant column for the addresses and remove it from
+            // here or add constraints to the column here.
             trace[0][i] = BaseField::from_u32_unchecked(i as u32);
             trace[1][i] = BaseField::from_u32_unchecked(*multiplicity);
         }
@@ -217,7 +182,7 @@ impl ComponentTraceGenerator<CpuBackend> for RangeCheckUnitTraceGenerator {
 
     fn component(&self) -> RangeCheckUnitComponent {
         RangeCheckUnitComponent {
-            log_n_instances: self.max_value.checked_ilog2().unwrap(),
+            log_n_rows: self.max_value.checked_ilog2().unwrap(),
         }
     }
 }
