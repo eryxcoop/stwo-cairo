@@ -71,9 +71,7 @@ pub impl CosetImpl of CosetTrait {
         let double_initial_index = core::integer::u32_wrapping_add(
             *self.initial_index, *self.initial_index
         );
-        let double_step_size = core::integer::u32_wrapping_add(
-            *self.step_size, *self.step_size
-        );
+        let double_step_size = core::integer::u32_wrapping_add(*self.step_size, *self.step_size);
         let new_log_size = *self.log_size - 1;
 
         Coset {
