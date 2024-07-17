@@ -48,6 +48,7 @@ impl CirclePointM31Add of Add<CirclePointM31> {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Drop)]
 pub struct Coset {
+    // This is an index in the range [0, 2^31)
     pub initial_index: usize,
     pub step_size: usize,
     pub log_size: u32,
@@ -62,16 +63,15 @@ pub impl CosetImpl of CosetTrait {
     }
 
     fn new(initial_index: usize, log_size: u32) -> Coset {
+        assert!(initial_index < CIRCLE_ORDER);
         let step_size = pow(2, CIRCLE_LOG_ORDER - log_size);
         Coset { initial_index, step_size, log_size }
     }
 
     fn double(self: @Coset) -> Coset {
         assert!(*self.log_size > 0);
-        let double_initial_index = core::integer::u32_wrapping_add(
-            *self.initial_index, *self.initial_index
-        );
-        let double_step_size = core::integer::u32_wrapping_add(*self.step_size, *self.step_size);
+        let double_initial_index = *self.initial_index * 2;
+        let double_step_size = *self.step_size * 2;
         let new_log_size = *self.log_size - 1;
 
         Coset {
@@ -201,6 +201,14 @@ mod tests {
         let result = coset.at(17);
         let expected_result = CirclePointM31 { x: m31(7144319), y: m31(1742797653) };
         assert_eq!(expected_result, result);
+    }
+
+    #[test]
+    fn test_coset_size() {
+        let coset = Coset { initial_index: 16777216, step_size: 67108864, log_size: 5 };
+        let result = coset.size();
+        let expected_result = 32;
+        assert_eq!(result, expected_result);
     }
 }
 
