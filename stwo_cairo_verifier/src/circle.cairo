@@ -1,8 +1,9 @@
 use stwo_cairo_verifier::fields::m31::M31;
-use stwo_cairo_verifier::fields::qm31::{QM31, QM31Trait};
+use stwo_cairo_verifier::fields::qm31::{QM31, QM31Trait, QM31One};
 use super::utils::pow;
 use core::num::traits::zero::Zero;
 use core::num::traits::one::One;
+use stwo_cairo_verifier::channel::{Channel, ChannelTrait};
 
 pub const M31_CIRCLE_GEN: CirclePoint<M31> =
     CirclePoint::<M31> { x: M31 { inner: 2 }, y: M31 { inner: 1268011823 }, };
@@ -54,11 +55,31 @@ pub trait CirclePointTrait<F, +Add<F>, +Sub<F>, +Mul<F>, +Drop<F>, +Copy<F>, +Ze
         };
         result
     }
+    fn get_random_point(channel: Channel) -> CirclePoint<F>;
 }
 
-pub impl CirclePointM31Impl of CirclePointTrait<M31> {}
+pub impl CirclePointM31Impl of CirclePointTrait<M31> {
 
-pub impl CirclePointQM31Impl of CirclePointTrait<QM31> {}
+    fn get_random_point(channel: Channel) -> CirclePoint<M31>{
+        // TODO
+        CirclePointTrait::zero()
+    }
+}
+
+pub impl CirclePointQM31Impl of CirclePointTrait<QM31> {
+
+    fn get_random_point(mut channel: Channel) -> CirclePoint<QM31> {
+        let t = channel.draw_felt();
+        let t_square = t*t;
+
+        let one_plus_tsquared_inv = (t_square + QM31One::one()).inverse();
+
+        let x = (QM31One::one() - t_square) * one_plus_tsquared_inv;
+        let y = (t+t)* one_plus_tsquared_inv;
+
+        CirclePoint { x, y }
+    }
+}
 
 trait ComplexConjugate {
     fn complex_conjugate(self: CirclePoint<QM31>) -> CirclePoint<QM31>;

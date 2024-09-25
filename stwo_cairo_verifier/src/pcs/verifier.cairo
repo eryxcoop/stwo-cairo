@@ -46,7 +46,7 @@ pub trait CommitmentSchemeVerifierTrait {
     ) -> Result<(), VerificationError>;
 }
 
-impl CommitmentSchemeVerifierImpl of CommitmentSchemeVerifierTrait {
+pub impl CommitmentSchemeVerifierImpl of CommitmentSchemeVerifierTrait {
     fn new(config: PcsConfig) -> CommitmentSchemeVerifier {
         CommitmentSchemeVerifier { trees: array![], config: config }
     }
@@ -282,11 +282,11 @@ pub struct PcsConfig {
 
 #[derive(Drop)]
 pub struct CommitmentSchemeProof {
-    sampled_values: Array<Array<Array<QM31>>>,
-    decommitments: Array<MerkleDecommitment>,
-    queried_values: Array<Array<Span<M31>>>,
-    proof_of_work: u64,
-    fri_proof: FriProof
+    pub sampled_values: Array<Array<Array<QM31>>>,
+    pub decommitments: Array<MerkleDecommitment>,
+    pub queried_values: Array<Array<Span<M31>>>,
+    pub proof_of_work: u64,
+    pub fri_proof: FriProof
 }
 
 pub trait MerkleChannelTrait {
