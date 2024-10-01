@@ -18,6 +18,7 @@ pub const CIRCLE_ORDER_BIT_MASK: u32 = 0x7fffffff;
 // `U32_BIT_MASK` equals 2^32 - 1
 pub const U32_BIT_MASK: u64 = 0xffffffff;
 
+/// A point on the complex circle. Treated as an additive group.
 #[derive(Drop, Copy, Debug, PartialEq, Eq)]
 pub struct CirclePoint<F> {
     pub x: F,
@@ -70,6 +71,7 @@ pub impl ComplexConjugateImpl of ComplexConjugate {
     }
 }
 
+/// Represents the coset initial + \<step\>.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Drop)]
 pub struct Coset {
     // This is an index in the range [0, 2^31)
@@ -111,23 +113,29 @@ pub impl CosetImpl of CosetTrait {
         M31_CIRCLE_GEN.mul(self.index_at(index).into())
     }
 
+    /// Returns the size of the coset.
     fn size(self: @Coset) -> usize {
         pow(2, *self.log_size)
     }
 
+    /// Creates a coset of the form G_2n + \<G_n\>.
+    /// For example, for n=8, we get the point indices \[1,3,5,7,9,11,13,15\].
     fn odds(log_size: u32) -> Coset {
         //CIRCLE_LOG_ORDER
         let subgroup_generator_index = Self::subgroup_generator_index(log_size);
         Self::new(subgroup_generator_index, log_size)
     }
 
+    /// Creates a coset of the form G_4n + <G_n>.
+    /// For example, for n=8, we get the point indices \[1,5,9,13,17,21,25,29\].
+    /// Its conjugate will be \[3,7,11,15,19,23,27,31\].
+    fn half_odds(log_size: u32) -> Coset {
+        Self::new(Self::subgroup_generator_index(log_size + 2), log_size)
+    }
+
     fn subgroup_generator_index(log_size: u32) -> u32 {
         assert!(log_size <= CIRCLE_LOG_ORDER);
         pow(2, CIRCLE_LOG_ORDER - log_size)
-    }
-
-    fn half_odds(log_size: u32) -> Coset {
-        Self::new(Self::subgroup_generator_index(log_size + 2), log_size)
     }
 }
 
