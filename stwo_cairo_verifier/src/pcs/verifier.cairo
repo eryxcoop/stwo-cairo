@@ -20,6 +20,8 @@ use core::dict::Felt252DictEntryTrait;
 use stwo_cairo_verifier::sort::MaximumToMinimumSortedIterator;
 use stwo_cairo_verifier::fri::verifier::FriVerificationError;
 
+
+/// The verifier side of a FRI polynomial commitment scheme. See [super].
 #[derive(Drop)]
 pub struct CommitmentSchemeVerifier {
     pub trees: Array<MerkleVerifier<PoseidonMerkleHasher>>,
@@ -29,8 +31,10 @@ pub struct CommitmentSchemeVerifier {
 pub trait CommitmentSchemeVerifierTrait {
     fn new(config: PcsConfig) -> CommitmentSchemeVerifier;
 
+    /// An Array<Array<u32>> of the log sizes of each column in each commitment tree.
     fn column_log_sizes(self: @CommitmentSchemeVerifier) -> Array<Array<u32>>;
 
+    /// Reads a commitment from the prover.
     fn commit(
         ref self: CommitmentSchemeVerifier,
         commitment: felt252,
@@ -195,7 +199,6 @@ impl CommitmentSchemeVerifierImpl of CommitmentSchemeVerifierTrait {
             i = i + 1;
         };
 
-        // TODO: Make sure this channel is correct (no wrong appends in the middle).
         let column_log_sizes = self.column_log_sizes();
         let mut flattened_column_log_sizes = array![];
         let mut i = 0;

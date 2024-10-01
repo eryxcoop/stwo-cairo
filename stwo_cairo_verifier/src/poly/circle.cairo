@@ -11,7 +11,6 @@ use stwo_cairo_verifier::circle::{
 use stwo_cairo_verifier::fri::folding::fold_circle_into_line;
 
 /// A valid domain for circle polynomial interpolation and evaluation.
-///
 /// Valid domains are a disjoint union of two conjugate cosets: `+-C + <G_n>`.
 /// The ordering defined on this domain is `C + iG_n`, and then `-C - iG_n`.
 #[derive(Debug, Copy, Drop, PartialEq, Eq)]
@@ -21,18 +20,23 @@ pub struct CircleDomain {
 
 #[generate_trait]
 pub impl CircleDomainImpl of CircleDomainTrait {
+    /// Given a coset C + <G_n>, constructs the circle domain +-C + <G_n> (i.e.,
+    /// this coset and its conjugate).
     fn new(half_coset: Coset) -> CircleDomain {
         CircleDomain { half_coset }
     }
 
-    fn log_size(self: @CircleDomain) -> usize {
-        *self.half_coset.log_size + 1
-    }
-
+    /// Returns the size of the domain.
     fn size(self: @CircleDomain) -> usize {
         pow(2, self.log_size())
     }
 
+    /// Returns the log size of the domain.
+    fn log_size(self: @CircleDomain) -> usize {
+        *self.half_coset.log_size + 1
+    }
+
+    /// Returns the circle point index of the `i`th domain element.
     fn index_at(self: @CircleDomain, index: usize) -> usize {
         if index < self.half_coset.size() {
             self.half_coset.index_at(index)
@@ -41,6 +45,7 @@ pub impl CircleDomainImpl of CircleDomainTrait {
         }
     }
 
+    /// Returns the `i` th domain element.
     fn at(self: @CircleDomain, index: usize) -> CirclePoint<M31> {
         M31_CIRCLE_GEN.mul(self.index_at(index).into())
     }
@@ -50,7 +55,8 @@ pub impl CircleDomainImpl of CircleDomainTrait {
     }
 }
 
-
+/// An evaluation defined on a [CircleDomain].
+/// The values are ordered according to the [CircleDomain] ordering.
 #[derive(Debug, Drop, Clone, PartialEq, Eq)]
 pub struct CircleEvaluation {
     pub values: Array<QM31>,
@@ -64,6 +70,7 @@ pub impl CircleEvaluationImpl of CircleEvaluationTrait {
     }
 }
 
+/// Holds a foldable subset of circle polynomial evaluations.
 #[derive(Drop, Clone, Debug, PartialEq)]
 pub struct SparseCircleEvaluation {
     pub subcircle_evals: Array<CircleEvaluation>

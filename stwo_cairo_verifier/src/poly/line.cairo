@@ -16,20 +16,26 @@ use stwo_cairo_verifier::poly::circle::{
 };
 use stwo_cairo_verifier::fri::folding::fold_line;
 
-/// A univariate polynomial represented by its coefficients in the line part of the FFT-basis
-/// in bit reversed order.
+
+/// A univariate polynomial defined on a [LineDomain].
 #[derive(Debug, Drop, Clone)]
 pub struct LinePoly {
+    /// Coefficients of the polynomial in [line_ifft] algorithm's basis.
+    ///
+    /// The coefficients are stored in bit-reversed order.
     pub coeffs: Array<SecureField>,
+    /// The number of coefficients stored as `log2(len(coeffs))`.
     pub log_size: u32,
 }
 
 #[generate_trait]
 pub impl LinePolyImpl of LinePolyTrait {
+    /// Returns the number of coefficients.
     fn len(self: @LinePoly) -> usize {
         self.coeffs.len()
     }
 
+    /// Evaluates the polynomial at a single point.
     fn eval_at_point(self: @LinePoly, mut x: SecureField) -> SecureField {
         let mut doublings = array![];
         let mut i = 0;
@@ -44,7 +50,9 @@ pub impl LinePolyImpl of LinePolyTrait {
     }
 }
 
-
+/// Domain comprising of the x-coordinates of points in a [Coset].
+///
+/// For use with univariate polynomials.
 #[derive(Copy, Drop, Debug)]
 pub struct LineDomain {
     pub coset: Coset,
@@ -53,47 +61,54 @@ pub struct LineDomain {
 
 #[generate_trait]
 pub impl LineDomainImpl of LineDomainTrait {
+    /// Returns a domain comprising of the x-coordinates of points in a coset.
     fn new(coset: Coset) -> LineDomain {
-        // TODO: Implement assertions.
         LineDomain { coset: coset }
     }
 
-    fn double(self: @LineDomain) -> LineDomain {
-        LineDomain { coset: self.coset.double() }
-    }
-
+    /// Returns the `i`th domain element.
     fn at(self: @LineDomain, index: usize) -> M31 {
         self.coset.at(index).x
     }
 
+    /// Returns the size of the domain.
+    fn size(self: @LineDomain) -> usize {
+        self.coset.size()
+    }
+
+    /// Returns the log size of the domain.
     fn log_size(self: @LineDomain) -> usize {
         *self.coset.log_size
     }
 
-    fn size(self: @LineDomain) -> usize {
-        self.coset.size()
+    /// Returns a new domain comprising of all points in current domain doubled.
+    fn double(self: @LineDomain) -> LineDomain {
+        LineDomain { coset: self.coset.double() }
     }
 }
 
 
+/// Evaluations of a univariate polynomial on a [LineDomain].
 #[derive(Drop)]
 pub struct LineEvaluation {
     pub values: Array<QM31>,
     pub domain: LineDomain
 }
 
-
-#[derive(Drop)]
-pub struct SparseLineEvaluation {
-    pub subline_evals: Array<LineEvaluation>,
-}
-
 #[generate_trait]
 pub impl LineEvaluationImpl of LineEvaluationTrait {
+    /// Creates new [LineEvaluation] from a set of polynomial evaluations over a [LineDomain].
     fn new(domain: LineDomain, values: Array<QM31>) -> LineEvaluation {
         assert_eq!(values.len(), domain.size());
         LineEvaluation { values: values, domain: domain }
     }
+}
+
+/// Holds a small foldable subset of univariate SecureField polynomial evaluations.
+/// Evaluation is held at the CPU backend.
+#[derive(Drop)]
+pub struct SparseLineEvaluation {
+    pub subline_evals: Array<LineEvaluation>,
 }
 
 #[generate_trait]

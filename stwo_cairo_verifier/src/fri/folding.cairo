@@ -13,6 +13,7 @@ use stwo_cairo_verifier::poly::circle::{
 use stwo_cairo_verifier::poly::line::{LineEvaluation, LineEvaluationImpl};
 
 
+/// Folds a degree `d` polynomial into a degree `d/2` polynomial.
 pub fn fold_line(eval: @LineEvaluation, alpha: QM31) -> LineEvaluation {
     let domain = eval.domain;
     let mut values: Array<QM31> = array![];
@@ -30,6 +31,14 @@ pub fn fold_line(eval: @LineEvaluation, alpha: QM31) -> LineEvaluation {
 }
 
 
+/// Folds and accumulates a degree `d` circle polynomial into a degree `d/2` univariate
+/// polynomial.
+///
+/// Let `src` be the evaluation of a circle polynomial `f` on a
+/// [`CircleDomain`] `E`. This function computes evaluations of `f' = f0
+/// + alpha * f1` on the x-coordinates of `E` such that `2f(p) = f0(px) + py * f1(px)`. The
+/// evaluations of `f'` are accumulated into `dst` by the formula `dst = dst * alpha^2 +
+/// f'`.
 pub fn fold_circle_into_line(eval: @CircleEvaluation, alpha: QM31) -> LineEvaluation {
     let domain = eval.domain;
     let mut values = array![];

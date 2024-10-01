@@ -6,6 +6,7 @@ use stwo_cairo_verifier::queries::{SparseSubCircleDomain, SubCircleDomain};
 use stwo_cairo_verifier::sort::MinimumToMaximumSortedIterator;
 
 
+/// An ordered set of query indices over a bit reversed [CircleDomain].
 #[derive(Drop, Clone, Debug, PartialEq, Eq)]
 pub struct Queries {
     pub positions: Array<usize>,
@@ -14,6 +15,7 @@ pub struct Queries {
 
 #[generate_trait]
 pub impl QueriesImpl of QueriesImplTrait {
+    /// Randomizes a set of query indices uniformly over the range [0, 2^`log_query_size`).
     fn generate(ref channel: Channel, log_domain_size: u32, n_queries: usize) -> Queries {
         let mut nonsorted_positions = array![];
         let max_query = pow(2, log_domain_size) - 1;
@@ -52,6 +54,8 @@ pub impl QueriesImpl of QueriesImplTrait {
         self.positions.len()
     }
 
+    /// Calculates the matching query indices in a folded domain (i.e each domain point is doubled)
+    /// given `self` (the queries of the original domain) and the number of folds between domains.
     fn fold(self: @Queries, n_folds: u32) -> Queries {
         assert!(n_folds <= *self.log_domain_size);
         assert!(self.positions.len() > 0);

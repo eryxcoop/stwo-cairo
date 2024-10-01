@@ -17,6 +17,7 @@ pub struct SubCircleDomain {
 
 #[generate_trait]
 pub impl SubCircleDomainImpl of SubCircleDomainTrait {
+    /// Calculates the decommitment positions needed for each query given the fri step size.
     fn to_decommitment_positions(self: @SubCircleDomain) -> Array<usize> {
         let mut res = array![];
         let start = *self.coset_index * pow(2, *self.log_size);
@@ -29,6 +30,7 @@ pub impl SubCircleDomainImpl of SubCircleDomainTrait {
         res
     }
 
+    /// Returns the represented [CircleDomain].
     fn to_circle_domain(self: @SubCircleDomain, query_domain: CircleDomain) -> CircleDomain {
         let index = *self.coset_index * pow(2, *self.log_size);
         let query = bit_reverse_index(index, query_domain.log_size());

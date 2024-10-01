@@ -44,6 +44,7 @@ struct FriLayerVerifier {
 
 #[generate_trait]
 impl FriLayerVerifierImpl of FriLayerVerifierTrait {
+    /// Verifies the layer's merkle decommitment and returns the the folded queries and query evals.
     fn verify_and_fold(
         self: @FriLayerVerifier, queries: @Queries, evals_at_queries: @Array<QM31>
     ) -> Result<(Queries, Array<QM31>), FriVerificationError> {
@@ -117,6 +118,7 @@ impl FriLayerVerifierImpl of FriLayerVerifierTrait {
         }
     }
 
+    /// Returns the evaluations needed for decommitment.
     fn extract_evaluation(
         self: @FriLayerVerifier, queries: @Queries, evals_at_queries: @Array<QM31>
     ) -> Result<SparseLineEvaluation, FriVerificationError> {
@@ -198,6 +200,10 @@ pub struct FriConfig {
     pub n_queries: usize,
 }
 
+
+/// Stores a subset of evaluations in a fri layer with their corresponding merkle decommitments.
+///
+/// The subset corresponds to the set of evaluations needed by a FRI verifier.
 #[derive(Drop, Clone, Debug)]
 pub struct FriLayerProof {
     pub evals_subset: Array<QM31>,
@@ -395,7 +401,6 @@ pub impl FriVerifierImpl of FriVerifierTrait {
         }
     }
 
-    // TODO: Return opening positions
     fn column_query_positions(
         ref self: FriVerifier, ref channel: Channel
     ) -> (Felt252Dict<Nullable<SparseSubCircleDomain>>, Span<u32>) {
