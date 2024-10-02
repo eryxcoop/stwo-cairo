@@ -231,6 +231,10 @@ pub struct FriVerifier {
 
 #[generate_trait]
 pub impl FriVerifierImpl of FriVerifierTrait {
+    
+    /// Verifies the commitment stage of FRI.
+    ///
+    /// `column_bounds` should be the committed circle polynomial degree bounds in descending order.
     fn commit(
         ref channel: Channel, config: FriConfig, proof: FriProof, column_bounds: Array<u32>
     ) -> Result<FriVerifier, FriVerificationError> {
@@ -302,6 +306,21 @@ pub impl FriVerifierImpl of FriVerifierTrait {
         )
     }
 
+    /// Verifies the decommitment stage of FRI.
+    ///
+    /// The decommitment values need to be provided in the same order as their commitment.
+    fn decommit(
+        self: @FriVerifier, decommitted_values: Array<SparseCircleEvaluation>,
+    ) -> Result<(), FriVerificationError> {
+        let queries = if let Option::Some(queries_snapshot) = self.queries {
+            Option::Some(queries_snapshot)
+        } else {
+            Option::None
+        }
+            .expect('queries not sampled');
+        self.decommit_on_queries(queries, decommitted_values)
+    }
+
     fn decommit_on_queries(
         self: @FriVerifier, queries: @Queries, decommitted_values: Array<SparseCircleEvaluation>
     ) -> Result<(), FriVerificationError> {
@@ -312,6 +331,9 @@ pub impl FriVerifierImpl of FriVerifierTrait {
         self.decommit_last_layer(last_layer_queries, last_layer_query_evals)
     }
 
+    /// Verifies all inner layer decommitments.
+    ///
+    /// Returns the queries and query evaluations needed for verifying the last FRI layer.
     fn decommit_inner_layers(
         self: @FriVerifier, queries: @Queries, decommitted_values: @Array<SparseCircleEvaluation>
     ) -> Result<(Queries, Array<QM31>), FriVerificationError> {
@@ -378,6 +400,7 @@ pub impl FriVerifierImpl of FriVerifierTrait {
         }
     }
 
+    /// Verifies the last layer.
     fn decommit_last_layer(
         self: @FriVerifier, queries: Queries, query_evals: Array<QM31>,
     ) -> Result<(), FriVerificationError> {
@@ -401,6 +424,9 @@ pub impl FriVerifierImpl of FriVerifierTrait {
         }
     }
 
+    /// Samples queries and returns the opening positions for each unique column size.
+    ///
+    /// The order of the opening positions corresponds to the order of the column commitment.
     fn column_query_positions(
         ref self: FriVerifier, ref channel: Channel
     ) -> (Felt252Dict<Nullable<SparseSubCircleDomain>>, Span<u32>) {
@@ -425,20 +451,12 @@ pub impl FriVerifierImpl of FriVerifierTrait {
 
         (get_opening_positions(@queries, column_log_sizes.span()), column_log_sizes.span())
     }
-
-    fn decommit(
-        self: @FriVerifier, decommitted_values: Array<SparseCircleEvaluation>,
-    ) -> Result<(), FriVerificationError> {
-        let queries = if let Option::Some(queries_snapshot) = self.queries {
-            Option::Some(queries_snapshot)
-        } else {
-            Option::None
-        }
-            .expect('queries not sampled');
-        self.decommit_on_queries(queries, decommitted_values)
-    }
 }
 
+/// Returns the column opening positions needed for verification.
+///
+/// The column log sizes must be unique and in descending order. Returned
+/// column opening positions are mapped by their log size.
 fn get_opening_positions(
     queries: @Queries, column_log_sizes: Span<u32>,
 ) -> Felt252Dict<Nullable<SparseSubCircleDomain>> {
